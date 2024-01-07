@@ -11,11 +11,11 @@ with open("../DATA/input.txt",'r') as file:
     
     
 # hyperparameters
-batch_size = 32
-block_size = 5
-max_iters = 10000 # how many iterations to train for
+batch_size = 2
+block_size = 10
+max_iters = 3000 # how many iterations to train for
 evan_interval = 300 # interval to evaluate the model performance
-learning_rate = 0.01 
+learning_rate = 0.0001 
 device = "cuda" if torch.cuda.is_available() else "cpu" # use gpu if available
 eval_iters = 200
 
@@ -32,7 +32,7 @@ index_to_char = {i:c for i,c in enumerate(chars)}
 
 # create an encoder and decoder functions
 encode = lambda x: torch.tensor([char_to_index[c] for c in x])
-decode = lambda x: torch.tensor([index_to_char[i] for i in x])
+decode = lambda x: [index_to_char[i] for i in x]
 
 # split data into train and validation sets
 data = encode(text)
@@ -53,6 +53,9 @@ def get_batch(split,block_size,batch_size):
     
     x = torch.stack([data[i:i+block_size] for i in start_index])
     y = torch.stack([data[i+1:i+block_size+1] for i in start_index])
+    
+    x = x.to(device)
+    y = y.to(device)
     
     return x,y
 
@@ -97,7 +100,7 @@ class BigramLanguageModel(nn.Module):
         self.token_embedding = nn.Embedding(vocab_size,vocab_size)
         
         
-    def forward(self,idx,targets):
+    def forward(self,idx,targets=None):
         
         
         logits = self.token_embedding(idx)
@@ -142,12 +145,51 @@ class BigramLanguageModel(nn.Module):
             logits = logits[:,-1,:]
             # apply softmax to get probabilities
             probs = F.softmax(logits,dim=-1)
+            # sample from distribution
+            idx_next = torch.multinomial(probs,num_samples=1)
+            idx = torch.cat((idx,idx_next),dim=1)
+            
+        return idx
             
             
         
 model = BigramLanguageModel(vocab_size)
+m = model.to(device)
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
 
-x,y = get_batch("train",block_size,batch_size)
 
-logits = model(x,y)
+for iter in range(max_iters):
+    
+    # every once in a while evaluate the loss on train and validation sets
+    if iter%eval_iters == 0:
+        
+        losses = estimate_loss(model)
+        print(f"At iteration {iter}/{max_iters}, Train loss: {losses['train']}, Validation loss: {losses['validation']}")
+
+    # get a batch of data
+    x,y = get_batch("train",block_size,batch_size)
+    
+    # evaluate loss and update parameters
+    lotigs, loss = model(x,y)
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
+
+
+
+while True:
+    context = input("\nEnter a context: ")
+    
+    if context == 'quit':
+        break
+    context = encode(context).reshape(-1,1)
+    
+    context = context.to(device)
+    
+    response = m.generate(context,10)[0].tolist()
+    
+    
+    # print([index_to_char[i] for i in response])
+    response = "".join(decode(response))
+    print(response)
 
