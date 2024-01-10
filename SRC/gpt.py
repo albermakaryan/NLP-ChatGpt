@@ -5,11 +5,11 @@ from icecream import ic
 
 
 # hyperparameters
-batch_size = 32
+batch_size = 16
 block_size = 256
-max_iters = 10000
+max_iters = 3000
 eval_intervals = 500
-learning_rate = 3e-2
+learning_rate = 0.1
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
 n_embd = 256
@@ -19,15 +19,17 @@ droupout = 0.3
 
 model_path = "../models/gpt.pt"
 model_path = "../models/airbnb_chat_bot.pt"
-model_path = "../models/go_travel_articles_bot.pt"
+model_path = "../models/go_travel_articles_bot_gpt.pt"
 
 data_path = '../DATA/go_world_travel_article.txt'
+
 # ------------------- #
 
 # read data
 with open(data_path,'r',encoding='utf-8') as file:
     
     text = file.read()
+
     
     
 print(len(text))
@@ -272,25 +274,30 @@ print(sum(p.numel() for p in m.parameters())/1e6,'M parameters')
 optimizer = torch.optim.AdamW(m.parameters(),lr=learning_rate)
 
 
-for iter in range(max_iters):
-    
+train_model = input("Train model? (y/n): ")
 
-    
-    if iter % eval_intervals == 0:
+if __name__ == "__main__" and train_model == "y":
+
+
+    for iter in range(max_iters):
         
-        losses = esimate_loss(m)
-        print(f"iter {iter} | train loss {losses['train']} | val loss {losses['val']}")
+
+        
+        if iter % eval_intervals == 0:
+            
+            losses = esimate_loss(m)
+            print(f"iter {iter} / {max_iters} | train loss {losses['train']} | val loss {losses['val']}")
+            
+        
+        x,y = get_batch("train")
+        logits,loss = m(x,y)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        
         
     
-    x,y = get_batch("train")
-    logits,loss = m(x,y)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
-    
-    
-    
-torch.save(m,model_path)
+    torch.save(m,model_path)
 
 
 
@@ -306,7 +313,8 @@ while True:
     
     context = encode(context).reshape(-1,1).to(device)
     
-    max_tokens = int(input("Enter max tokens: "))
+    # max_tokens = int(input("Enter max tokens: "))
+    max_tokens = 500
     
     
     print("".join(decode(model.generate(context, max_new_tokens=max_tokens)[0].tolist())))

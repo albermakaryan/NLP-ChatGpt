@@ -2,25 +2,25 @@ import torch
 from icecream import ic
 import os
 
-model = torch.load("../models/gpt.pt")
+from gpt import *
 
-from gpt import GPTLanguageModel
+model = torch.load(model_path)
 
-from gpt import decode,encode
 
 
 while True:
+    context = input("\nEnter a context: ")
     
-    context = input("Enter a prompt: ")
-    
-    if context == "exit":
+    if context == 'quit':
         break
+    context = encode(context).reshape(-1,1)
     
-    context = encode(context)
+    context = context.to(device)
     
-    response = model.generate(context)
-    
-    print(decode(response))
+    response = m.generate(context,300)[0].tolist()
     
     
+    # print([index_to_char[i] for i in response])
+    response = "".join(decode(response))
+    print(response)
     
