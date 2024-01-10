@@ -5,17 +5,20 @@ from icecream import ic
 
 # read data
 
-with open("../DATA/input.txt",'r') as file:
+with open("../DATA/go_world_travel_article.txt",'r') as file:
     text = file.read()
     
     
+model_path = "../models/go_travel_articles_bot_bigram.pt"
+
+    
     
 # hyperparameters
-batch_size = 2
-block_size = 10
-max_iters = 3000 # how many iterations to train for
+batch_size = 32
+block_size = 12
+max_iters = 5000 # how many iterations to train for
 evan_interval = 300 # interval to evaluate the model performance
-learning_rate = 0.0001 
+learning_rate = 0.1
 device = "cuda" if torch.cuda.is_available() else "cpu" # use gpu if available
 eval_iters = 200
 
@@ -157,23 +160,31 @@ model = BigramLanguageModel(vocab_size)
 m = model.to(device)
 optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
 
+train_model = input("Train model? (y/n): ")
 
-for iter in range(max_iters):
-    
-    # every once in a while evaluate the loss on train and validation sets
-    if iter%eval_iters == 0:
+if __name__ == "__main__" and train_model == "y":
+
+    for iter in range(max_iters):
         
-        losses = estimate_loss(model)
-        print(f"At iteration {iter}/{max_iters}, Train loss: {losses['train']}, Validation loss: {losses['validation']}")
+        # every once in a while evaluate the loss on train and validation sets
+        if iter%eval_iters == 0:
+            
+            losses = estimate_loss(model)
+            print(f"At iteration {iter}/{max_iters}, Train loss: {losses['train']}, Validation loss: {losses['validation']}")
 
-    # get a batch of data
-    x,y = get_batch("train",block_size,batch_size)
-    
-    # evaluate loss and update parameters
-    lotigs, loss = model(x,y)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
+        # get a batch of data
+        x,y = get_batch("train",block_size,batch_size)
+        
+        # evaluate loss and update parameters
+        lotigs, loss = model(x,y)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+
+    torch.save(model,model_path)
+
+model = torch.load(model_path)
 
 
 
@@ -186,7 +197,7 @@ while True:
     
     context = context.to(device)
     
-    response = m.generate(context,10)[0].tolist()
+    response = m.generate(context,300)[0].tolist()
     
     
     # print([index_to_char[i] for i in response])

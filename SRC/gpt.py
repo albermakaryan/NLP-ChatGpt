@@ -5,11 +5,11 @@ from icecream import ic
 
 
 # hyperparameters
-batch_size = 32
+batch_size = 16
 block_size = 256
-max_iters = 5500
+max_iters = 3000
 eval_intervals = 500
-learning_rate = 3e-4
+learning_rate = 0.1
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
 n_embd = 256
@@ -18,12 +18,21 @@ n_layer = 8
 droupout = 0.3
 
 model_path = "../models/gpt.pt"
+model_path = "../models/airbnb_chat_bot.pt"
+model_path = "../models/go_travel_articles_bot_gpt.pt"
+
+data_path = '../DATA/go_world_travel_article.txt'
+
 # ------------------- #
 
 # read data
-with open("../DATA/input.txt",'r') as file:
+with open(data_path,'r',encoding='utf-8') as file:
     
     text = file.read()
+
+    
+    
+print(len(text))
     
     
 # tokenization
@@ -33,6 +42,7 @@ char_to_index = {c:i for i,c in enumerate(chars)}
 index_to_char = {i:c for i,c in enumerate(chars)}
 
 # create an encoder and decoder functions
+
 encode = lambda x: torch.tensor([char_to_index[c] for c in x])
 decode = lambda x: [index_to_char[i] for i in x]
 
@@ -42,6 +52,9 @@ data = encode(text)
 train_size = int(0.9*len(data))
 train_set = data[:train_size]
 val_set = data[train_size:]
+
+# print(chars)
+# quit()
 
 # create a dataloader
 
@@ -244,6 +257,13 @@ class GPTLanguageModel(nn.Module):
         return idx
     
     
+
+
+context = torch.zeros((1, 1), dtype=torch.long, device=device)
+
+
+
+    
 model = GPTLanguageModel()
 m = model.to(device)
 
@@ -254,24 +274,55 @@ print(sum(p.numel() for p in m.parameters())/1e6,'M parameters')
 optimizer = torch.optim.AdamW(m.parameters(),lr=learning_rate)
 
 
-for iter in range(max_iters):
+train_model = input("Train model? (y/n): ")
+
+if __name__ == "__main__" and train_model == "y":
+
+
+    for iter in range(max_iters):
+        
+
+        
+        if iter % eval_intervals == 0:
+            
+            losses = esimate_loss(m)
+            print(f"iter {iter} / {max_iters} | train loss {losses['train']} | val loss {losses['val']}")
+            
+        
+        x,y = get_batch("train")
+        logits,loss = m(x,y)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        
+        
     
+    torch.save(m,model_path)
+
+
+
+model = torch.load(model_path)
+
+
+while True:
+    
+    context = input("Enter a prompt: ")
+    
+    if context == "exit":
+        break
+    
+    context = encode(context).reshape(-1,1).to(device)
+    
+    # max_tokens = int(input("Enter max tokens: "))
+    max_tokens = 500
+    
+    
+    print("".join(decode(model.generate(context, max_new_tokens=max_tokens)[0].tolist())))
+    print()
 
     
-    if iter % eval_intervals == 0:
-        
-        losses = esimate_loss(m)
-        print(f"iter {iter} | train loss {losses['train']} | val loss {losses['val']}")
-        
-    
-    x,y = get_batch("train")
-    logits,loss = m(x,y)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
     
     
-    
-torch.save(m.state_dict(),model_path)
+quit()
     
     
